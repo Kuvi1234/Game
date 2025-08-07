@@ -1,0 +1,239 @@
+// Node.cs
+using System;
+
+namespace GameScriptManager.Models
+{
+    public class Node
+    {
+        public int StoryNumber { get; set; }
+        public string Text { get; set; }
+        public Node Next { get; set; }
+
+        public Node(int storyNumber, string text)
+        {
+            StoryNumber = storyNumber;
+            Text = text;
+            Next = null;
+        }
+    }
+}
+
+// LinkedList.cs
+using System;
+using GameScriptManager.Models;
+
+namespace GameScriptManager.Models
+{
+    public class LinkedList
+n    {
+        public Node Head { get; private set; }
+        public int Count { get; private set; }
+
+        public LinkedList()
+        {
+            Head = null;
+            Count = 0;
+        }
+
+        public void Add(int storyNumber, string text)
+        {
+            var newNode = new Node(storyNumber, text);
+            if (Head == null)
+            {
+                Head = newNode;
+            }
+            else
+            {
+                var current = Head;
+                while (current.Next != null)
+                    current = current.Next;
+                current.Next = newNode;
+            }
+            Count++;
+        }
+
+        public void Sort()
+        {
+            Head = MergeSort(Head);
+        }
+
+        private Node MergeSort(Node head)
+        {
+            if (head == null || head.Next == null)
+                return head;
+
+            // Split
+            var middle = GetMiddle(head);
+            var nextOfMiddle = middle.Next;
+            middle.Next = null;
+
+            var left = MergeSort(head);
+            var right = MergeSort(nextOfMiddle);
+
+            // Merge
+            return SortedMerge(left, right);
+        }
+
+        private Node GetMiddle(Node head)
+        {
+            var slow = head;
+            var fast = head.Next;
+            while (fast != null)
+            {
+                fast = fast.Next;
+                if (fast != null)
+                {
+                    slow = slow.Next;
+                    fast = fast.Next;
+                }
+            }
+            return slow;
+        }
+
+        private Node SortedMerge(Node a, Node b)
+        {
+            if (a == null) return b;
+            if (b == null) return a;
+
+            Node result;
+            if (a.StoryNumber <= b.StoryNumber)
+            {
+                result = a;
+                result.Next = SortedMerge(a.Next, b);
+            }
+            else
+            {
+                result = b;
+                result.Next = SortedMerge(a, b.Next);
+            }
+            return result;
+        }
+
+        public string[] ToArray()
+        {
+            var arr = new string[Count];
+            var current = Head;
+            int idx = 0;
+            while (current != null)
+            {
+                arr[idx++] = current.Text;
+                current = current.Next;
+            }
+            return arr;
+        }
+    }
+}
+
+// ScriptController.cs
+using System;
+using System.IO;
+using GameScriptManager.Models;
+
+namespace GameScriptManager.Controllers
+{
+    public class ScriptController
+    {
+        private LinkedList _scriptList;
+
+        public ScriptController()
+        {
+            _scriptList = new LinkedList();
+        }
+
+        public void LoadFromFile(string path)
+        {
+            foreach (var line in File.ReadAllLines(path))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                var split = line.IndexOf(' ');
+                var number = int.Parse(line.Substring(0, split));
+                var text = line.Substring(split + 1);
+                _scriptList.Add(number, text);
+            }
+            _scriptList.Sort();
+        }
+
+        public string GetFullScript()
+        {
+            return string.Join(Environment.NewLine, _scriptList.ToArray());
+        }
+
+        public string[] GetLines()
+        {
+            return _scriptList.ToArray();
+        }
+    }
+}
+
+// MainForm.cs (WinForms)
+using System;
+using System.Windows.Forms;
+using GameScriptManager.Controllers;
+
+namespace GameScriptManager.Views
+{
+    public partial class MainForm : Form
+    {
+        private ScriptController _controller;
+        private string[] _lines;
+        private int _currentIndex;
+        private bool _lineMode;
+
+        public MainForm()
+        {
+            InitializeComponent();
+            _controller = new ScriptController();
+            _controller.LoadFromFile("Data/SampleScript.txt");
+            _lines = _controller.GetLines();
+            _currentIndex = 0;
+            _lineMode = false;
+            UpdateDisplay();
+        }
+
+        private void btnToggleView_Click(object sender, EventArgs e)
+        {
+            _lineMode = !_lineMode;
+            _currentIndex = 0;
+            UpdateDisplay();
+        }
+
+        private void btnNext_Click(object sender, EventArgs e)
+        {
+            if (_currentIndex < _lines.Length - 1)
+                _currentIndex++;
+            UpdateLine();
+        }
+
+        private void btnPrev_Click(object sender, EventArgs e)
+        {
+            if (_currentIndex > 0)
+                _currentIndex--;
+            UpdateLine();
+        }
+
+        private void UpdateDisplay()
+        {
+            if (_lineMode)
+            {
+                txtFull.Visible = false;
+                txtLine.Visible = true;
+                btnNext.Visible = true;
+                btnPrev.Visible = true;
+                UpdateLine();
+            }
+            else
+            {
+                txtLine.Visible = false;
+                btnNext.Visible = false;
+                btnPrev.Visible = false;
+                txtFull.Visible = true;
+                txtFull.Text = _controller.GetFullScript();
+            }
+        }
+
+        private void UpdateLine()
+        {
+            txtLine.Text = _lines[_currentIndex];
+        }
+    }
+}
